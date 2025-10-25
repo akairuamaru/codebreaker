@@ -1,0 +1,1433 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- CRITICAL FOR MOBILE: Ensures the page scales correctly on all devices -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passcode Breaker (Keypad Admin Unlock)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js for generating sound effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <style>
+        /* --- CSS Variables for Dynamic Theming --- */
+        :root {
+            /* LOVERS theme defaults */
+            --primary-color: #ec4899; 
+            --bg-color: #371d3d;     
+            --shadow-color: rgba(236, 72, 153, 0.7);
+            --admin-color: #a78bfa;   
+        }
+
+        /* --- Base Styles --- */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #121212;
+            /* Ensures minimum height for mobile view */
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* Responsive container ensures good scaling on all devices */
+        #game-container, #start-menu, #admin-auth-modal {
+            background-color: var(--bg-color);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            max-width: 450px;
+            width: 100%;
+            transition: all 0.5s ease;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            text-shadow: 0 0 5px var(--shadow-color);
+            font-weight: 800;
+        }
+        
+        /* Guess Display */
+        #guess-display {
+            font-size: 2.75rem; 
+            line-height: 4.5rem; 
+            background-color: #4a2d52; 
+            border: 3px solid var(--primary-color); 
+            color: #fce7f3; 
+            border-radius: 12px; 
+            text-align: center;
+            letter-spacing: 0.75rem; 
+            min-height: 72px; 
+            font-weight: 900; 
+            text-shadow: 0 0 8px rgba(252, 231, 243, 0.7); 
+        }
+        
+        /* Admin Auth Display */
+        #admin-auth-display {
+             background-color: #2c314a; /* Dark blue/gray */
+             border: 2px solid var(--admin-color);
+             color: #e0e7ff;
+             font-weight: 700;
+             text-shadow: 0 0 5px rgba(167, 139, 250, 0.5);
+             min-height: 60px;
+        }
+
+        /* --- Shared Buttons / Keypad Styles (Large touch targets for mobile) --- */
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: #121212;
+            font-weight: bold;
+            padding: 12px;
+            border-radius: 8px;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            filter: brightness(1.1);
+            transform: translateY(1px);
+        }
+
+        .btn-secondary {
+            background-color: #4a4a4a;
+            color: #e0e0e0;
+            padding: 12px;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background-color: #616161;
+        }
+
+        .btn-primary:disabled {
+            background-color: #333333; 
+            box-shadow: none !important;
+            cursor: not-allowed;
+            color: #9e9e9e;
+        }
+
+        /* --- Keypad & Pegs - ENHANCED STYLES --- */
+        .keypad-btn {
+            /* Base Appearance */
+            color: #fff;
+            padding: 18px; 
+            border-radius: 12px; 
+            font-size: 1.8rem; 
+            font-weight: 900; 
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.5); 
+            border: 1px solid var(--primary-color);
+
+            /* Background (Subtle Gradient for depth) */
+            background: linear-gradient(145deg, #444444, #333333);
+            
+            /* Box Shadow (Depth + Glow effect) */
+            box-shadow: 0 6px 0 0 #333, 0 0 15px rgba(236, 72, 153, 0.5); 
+
+            /* Transition and Interaction */
+            transition: all 0.15s ease;
+            user-select: none;
+            outline: none;
+            cursor: pointer;
+        }
+        /* Mobile/Touch friendly hover effects */
+        .keypad-btn:hover:not(.bg-transparent) {
+            background: linear-gradient(145deg, #555555, #444444);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 0 0 #333, 0 0 20px var(--primary-color);
+        }
+
+        .keypad-btn:active:not(.bg-transparent) {
+            transform: translateY(3px);
+            box-shadow: 0 3px 0 0 #333, 0 0 10px var(--primary-color); 
+        }
+        
+        /* Clear/Delete Button Adjustments */
+        .keypad-clear {
+             background: linear-gradient(145deg, #d97706, #ca8a04);
+             border: 1px solid #d97706;
+             font-size: 1.5rem;
+             box-shadow: 0 6px 0 0 #92400e, 0 0 15px rgba(234, 179, 8, 0.7);
+        }
+        
+        /* Submit/Enter Button Adjustments */
+        .keypad-submit {
+             background: linear-gradient(145deg, #10b981, #059669); /* Emerald Green */
+             border: 1px solid #10b981;
+             font-size: 1.5rem;
+             box-shadow: 0 6px 0 0 #047857, 0 0 15px rgba(16, 185, 129, 0.7);
+        }
+        
+        /* --- Feedback Colors --- */
+        .peg-bull { background-color: #34d399; } 
+        .peg-cow { background-color: #facc15; } 
+        .peg-miss { background-color: #ef4444; } 
+        
+        /* History & Pegs Layout */
+        #history-area {
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        #history > div {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            border-bottom: 1px solid #4a2d52;
+        }
+
+        .feedback-pegs {
+            display: flex;
+            gap: 4px;
+        }
+        .peg {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+    </style>
+</head>
+<body>
+
+    <!-- 1. START MENU SCREEN -->
+    <div id="start-menu" class="space-y-6">
+        <h1 class="text-4xl text-center mb-4">💖 HEART CODE 💖</h1>
+        <p class="text-lg text-center text-gray-300">Guess the secret code your lover sets.</p>
+        <p class="text-xs text-center text-red-400">🚨 **WARNING:** Every wrong guess triggers a DARE! 🚨</p>
+        
+        <!-- ROLE SELECTION BUTTONS -->
+        <h2 class="text-xl text-center text-white pt-4 font-bold">Who are you playing as?</h2>
+        
+        <button id="role-setter-btn" class="btn-primary w-full mt-2 bg-violet-500 hover:bg-violet-600">
+            I AM THE CODE SETTER 🔐
+        </button>
+        
+        <button id="role-breaker-btn" class="btn-primary w-full mt-4">
+            I AM THE CODE BREAKER (GUESSER) 🧠
+        </button>
+        <!-- END ROLE SELECTION -->
+
+    </div>
+    
+    <!-- 2. GAME SCREEN (Initially hidden) -->
+    <div id="game-container" class="space-y-6 hidden">
+        <h1 class="text-3xl text-center mb-4">HEART CODE</h1>
+        
+        <!-- Message/Status Area -->
+        <div id="message" class="p-3 rounded-lg text-center">
+            Ready to start!
+        </div>
+
+        <!-- Input Form (Visible for Breaker, Hidden on Win) -->
+        <div class="flex flex-col space-y-4" id="game-input">
+            <p id="game-description" class="text-sm text-center text-gray-400">Crack your partner's <b class="text-white">secret code</b> (0-9, digits may repeat).</p>
+            
+            <!-- Guess Display -->
+            <div id="guess-display" class="block">_____</div>
+            
+            <!-- Keypad Grid -->
+            <div id="keypad" class="grid grid-cols-3 gap-3 pt-2">
+                <!-- Keypad buttons will be generated here by JavaScript -->
+            </div>
+
+            <div class="flex space-x-4 pt-2">
+                <button id="submit-btn" class="btn-primary flex-1" disabled>
+                    SUBMIT GUESS
+                </button>
+                <button id="new-game-btn" class="btn-secondary w-1/3">
+                    MENU
+                </button>
+            </div>
+        </div>
+
+        <!-- Attempts and History -->
+        <div id="history-area" class="mt-6 pt-6 border-t border-gray-700">
+            <h2 class="text-xl font-bold mb-3 text-gray-300">Attempt History (<span id="attempts-left">10</span> left)</h2>
+            
+             <!-- Hints Area -->
+            <div id="hints-area" class="mt-2 p-3 bg-gray-700 rounded-lg text-sm hidden">
+                <p class="font-bold text-gray-300 mb-1">Current Hints:</p>
+                <ul id="hints-list" class="list-disc list-inside space-y-1 text-gray-400">
+                    <!-- Hints populated by JS -->
+                </ul>
+            </div>
+
+            <div id="history" class="space-y-2">
+                <!-- Guess history will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Admin Panel -->
+        <div id="admin-panel-container" class="mt-8 pt-6 border-t border-blue-500 hidden">
+            <h2 class="text-2xl font-bold mb-4 text-center" style="color: var(--admin-color);">🔐 Code Setter Panel 🔐</h2>
+            
+            <p class="text-sm text-center text-gray-400 mb-4">Current Code: <span id="current-passcode-display" class="font-mono text-yellow-400 text-lg"></span></p>
+
+            <!-- CODE/DARE/HINTS BLOCK -->
+            <div class="space-y-4">
+                <h3 class="text-xl font-bold text-gray-300 mb-2 border-b pb-2" style="border-color: var(--admin-color);">CODE & DARE Settings</h3>
+                <div>
+                    <label for="new-passcode" class="block text-sm font-medium text-gray-300 mb-1">Set New Passcode (Digits only):</label>
+                    <input type="text" id="new-passcode" inputmode="numeric" placeholder="e.g., 90210515" class="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:ring-blue-500 focus:border-blue-500">
+                    <p id="passcode-error" class="text-red-400 text-sm mt-1 hidden">Passcode must contain one or more numeric digits (0-9).</p>
+                </div>
+                
+                <!-- NEW ADMIN PASSCODE FIELD -->
+                <div class="mt-6">
+                    <label for="new-admin-passcode" class="block text-sm font-medium text-gray-300 mb-1" style="color: var(--admin-color);">Set New **Admin** Passcode (Digits only, must be unique from game code):</label>
+                    <input type="text" id="new-admin-passcode" inputmode="numeric" placeholder="e.g., 10252025" class="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:ring-blue-500 focus:border-blue-500">
+                    <p id="admin-passcode-error" class="text-red-400 text-sm mt-1 hidden">Admin Passcode must be one or more digits and cannot be the same as the Game Passcode.</p>
+                </div>
+                <!-- END NEW ADMIN PASSCODE FIELD -->
+
+                <!-- PROGRESSIVE HINTS FIELD -->
+                <h3 class="text-xl font-bold text-gray-300 mt-6 mb-2 border-b pb-2" style="border-color: #34d399;">HINT MANAGEMENT</h3>
+                <div>
+                    <label for="custom-hints" class="block text-sm font-medium text-gray-300 mb-1">Initial Custom Hints (Shown from start - One hint per line):</label>
+                    <textarea id="custom-hints" rows="4" class="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:ring-blue-500 focus:border-blue-500" placeholder="The code is your anniversary.&#10;It contains two zeros."></textarea>
+                </div>
+
+                <div>
+                    <label for="progressive-hints" class="block text-sm font-medium text-gray-300 mb-1">Progressive Hints (Revealed on 3+ Bulls - One hint per line):</label>
+                    <textarea id="progressive-hints" rows="4" class="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:ring-blue-500 focus:border-blue-500" placeholder="The first digit is less than 5.&#10;The sum of all digits is 15."></textarea>
+                </div>
+                <!-- END PROGRESSIVE HINTS FIELD -->
+
+
+                <h3 class="text-xl font-bold text-gray-300 mt-6 mb-2 border-b pb-2" style="border-color: #f87171;">DARE Settings</h3>
+                <div>
+                    <label for="custom-dares" class="block text-sm font-medium text-gray-300 mb-1">Custom Dares (One dare per line):</label>
+                    <textarea id="custom-dares" rows="4" class="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:ring-blue-500 focus:border-blue-500" placeholder="Give your partner a 30-second neck massage.&#10;Sing your partner's favorite song."></textarea>
+                </div>
+                
+                <!-- WINNER REWARD BLOCK -->
+                <h3 class="text-xl font-bold text-gray-300 mt-6 mb-2 border-b pb-2" style="border-color: var(--primary-color);">WINNER REWARD / REDIRECTION</h3>
+                
+                <div>
+                    <label for="winner-message-input" class="block text-sm font-medium text-gray-300 mb-1">Custom Success Message:</label>
+                    <textarea id="winner-message-input" rows="2" class="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:ring-blue-500 focus:border-blue-500" placeholder="You are amazing! The prize is yours!"></textarea>
+                </div>
+
+                <div>
+                    <label for="winner-link-input" class="block text-sm font-medium text-gray-300 mb-1">Redirection URL (Must be a full URL, e.g., https://example.com or just example.com):</label>
+                    <input type="url" id="winner-link-input" placeholder="e.g., https://your-reward.com/secret" class="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <!-- END WINNER REWARD BLOCK -->
+
+                <button id="save-config-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition duration-150">
+                    SAVE ALL CONFIGURATION
+                </button>
+            </div>
+            
+            <p id="save-status" class="text-center text-sm mt-4 hidden"></p>
+
+            <button id="admin-menu-btn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 rounded-lg transition duration-150 mt-4">
+                RETURN TO START MENU
+            </button>
+        </div>
+
+        <!-- Hidden Modal for Game Over/Defeat/WIN -->
+        <div id="modal-backdrop" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50">
+            <div id="game-modal" class="bg-gray-800 p-8 rounded-xl shadow-2xl text-center space-y-4 max-w-sm w-full">
+                <h3 id="modal-title" class="text-2xl font-extrabold text-white"></h3>
+                <p id="modal-message" class="text-lg text-gray-300"></p>
+                <p class="text-sm text-gray-500">The secret code was: <span id="secret-code-display" class="text-yellow-400 font-bold text-xl tracking-widest"></span></p>
+                <button id="modal-close-btn" data-action="menu" class="btn-primary w-full mt-4">Play Again (Menu)</button>
+            </div>
+        </div>
+        
+        <!-- Hidden Modal for DARE -->
+        <div id="dare-modal-backdrop" class="fixed inset-0 bg-black bg-opacity-80 hidden items-center justify-center z-50">
+            <div id="dare-modal" class="p-8 rounded-xl shadow-2xl text-center space-y-4 max-w-sm w-full border-4 border-pink-400" style="background-color: #9d174d;">
+                <h3 class="text-3xl font-extrabold text-white">🔥 DARE CHALLENGE 🔥</h3>
+                <p class="text-base text-gray-200">Wrong guess! Time for a consequence from the Code Setter.</p>
+                
+                <div id="dare-text" class="text-xl font-bold text-yellow-300 min-h-[4rem]">
+                    <!-- Random dare will be injected here with cycling effect -->
+                </div>
+    
+                <button id="dare-complete-btn" class="w-full bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-bold py-3 rounded-lg transition duration-150 mt-4">
+                    DARE COMPLETED! (Resume Game)
+                </button>
+            </div>
+        </div>
+
+        <!-- Hidden Modal for Admin Passcode Authentication (KEYPAD) -->
+        <div id="admin-auth-modal-backdrop" class="fixed inset-0 bg-black bg-opacity-80 hidden items-center justify-center z-50">
+            <div id="admin-auth-modal" class="p-8 rounded-xl shadow-2xl text-center space-y-6 max-w-sm w-full border-4" style="border-color: var(--admin-color); background-color: #1f2937;">
+                <h3 class="text-3xl font-extrabold text-white">🔐 ADMIN ACCESS 🔐</h3>
+                <p class="text-base text-gray-300">Enter the **Code Setter** passcode to unlock the configuration panel.</p>
+                
+                <!-- Display for Passcode Input -->
+                <div id="admin-auth-display" class="text-white p-3 rounded-lg text-3xl font-mono tracking-widest min-h-[60px] flex justify-center items-center">
+                    ____
+                </div>
+                
+                <p id="admin-auth-feedback" class="text-red-400 text-sm hidden">Incorrect Passcode.</p>
+
+                <!-- Keypad Grid for Admin -->
+                <div id="admin-keypad" class="grid grid-cols-3 gap-3 pt-2">
+                    <!-- Admin Keypad buttons generated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc, updateDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // --- GAME CONFIGURATION ---
+        const MAX_ATTEMPTS = 10;
+        const CONFIG_DOC_ID = 'lovers_config';
+        const PROGRESSIVE_BULLS_THRESHOLD = 3; 
+        
+        const THEME_CONFIG = {
+            primaryColor: '#ec4899',     // Pink-500
+            primaryShadow: '#db2777',
+            bgColor: '#371d3d',
+            shadowColor: 'rgba(236, 72, 153, 0.7)',
+            adminColor: '#a78bfa',
+        };
+        
+        const DEFAULT_DARES = [
+            "Give your partner a 30-second neck and shoulder massage.",
+            "Tell your partner three specific things you absolutely love about them.",
+            "Perform a silly 10-second dance in the middle of the room.",
+            "Write a cheesy 2-line poem about your partner and read it aloud.",
+        ];
+        
+        const DEFAULT_PROGRESSIVE_HINTS = [
+            "Hint 1: The first and last digits are different.",
+            "Hint 2: There is at least one odd number in the code.",
+            "Hint 3: The code contains no '7's or '8's.",
+            "Hint 4: The sum of the first two digits is less than 10.",
+        ];
+
+
+        // Fallback/Initial Configuration - ADMIN CODE MOVED HERE!
+        const DEFAULT_CONFIG = {
+            adminPasscode: "10252025", // Hidden from client code by storing in DB
+            secretCode: "05204", 
+            hints: ["The code is your anniversary.", "It contains two zeros."],
+            progressiveHints: DEFAULT_PROGRESSIVE_HINTS, 
+            revealedHints: [], 
+            dares: DEFAULT_DARES,
+            // Ensure default link is a full URL to pass validation
+            winnerLink: "https://placehold.co/400x100/ec4899/ffffff?text=YOUR+REWARD+GOES+HERE",
+            winnerMessage: "You are amazing! The prize is yours!",
+            lastUpdated: new Date().toISOString()
+        };
+        
+        const digitNotes = {
+            '0': 'C4', '1': 'D4', '2': 'E4', '3': 'F4', '4': 'G4', 
+            '5': 'A4', '6': 'B4', '7': 'C5', '8': 'D5', '9': 'E5',
+        };
+        // --- END CONFIGURATION ---
+
+        // Firebase variables
+        let app, db, auth;
+        let userId = 'anon'; 
+        
+        // Global game state variables (updated by Firestore)
+        let adminPasscodeStr = DEFAULT_CONFIG.adminPasscode; // New variable for fetched admin code
+        let secretCodeStr = DEFAULT_CONFIG.secretCode; 
+        let initialCustomHints = DEFAULT_CONFIG.hints;
+        let progressiveHints = DEFAULT_CONFIG.progressiveHints;
+        let revealedHints = DEFAULT_CONFIG.revealedHints; 
+        let currentDares = DEFAULT_DARES; 
+        let winnerLink = DEFAULT_CONFIG.winnerLink; 
+        let winnerMessage = DEFAULT_CONFIG.winnerMessage; 
+        let attempts = 0;
+        let isGameOver = false;
+        let currentGuessStr = ""; 
+        let isAuthReady = false;
+        let configSnapshotUnsubscribe = null;
+        let isDareActive = false; 
+        
+        // --- ADMIN KEYPAD STATE ---
+        let adminPasscodeInput = '';
+        
+        // --- TONE.JS INSTRUMENTS ---
+        let buttonSynth;
+
+        /**
+         * Initializes all Tone.js synths and loops.
+         */
+        function initAudio() {
+            if (typeof Tone === 'undefined') {
+                console.error("Tone.js not loaded. Audio disabled.");
+                return;
+            }
+            
+            // Changed to PolySynth to support playing chords
+            buttonSynth = new Tone.PolySynth(Tone.Synth, { 
+                oscillator: { type: "sine" },
+                envelope: { attack: 0.005, decay: 0.2, sustain: 0.0, release: 0.1 }
+            }).toDestination();
+        }
+
+        /**
+         * Triggers the cute bell pop sound.
+         */
+        function playClickSound(note = "C6") {
+            if (typeof Tone === 'undefined') return;
+            // Necessary to start audio context on user interaction (mobile requirement)
+            Tone.start(); 
+            if (buttonSynth) {
+                const now = Tone.now();
+                buttonSynth.triggerAttackRelease(note, 0.02, now + 0.005); 
+            }
+        }
+
+        /**
+         * FIX: Ensures a URL has a protocol (http/https) to enable external redirects.
+         * @param {string} url The URL string entered by the admin.
+         * @returns {string} The protocol-prefixed URL.
+         */
+        function formatUrlForRedirect(url) {
+            const trimmedUrl = url ? url.trim() : '';
+            if (trimmedUrl.length === 0) return '';
+            
+            // Check if it already starts with a known protocol
+            if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
+                return trimmedUrl;
+            }
+
+            // If no protocol is found, prepend 'https://'
+            return `https://${trimmedUrl}`;
+        }
+
+        // --- DOM elements ---
+        const startMenu = document.getElementById('start-menu');
+        const gameContainer = document.getElementById('game-container');
+        
+        const roleSetterBtn = document.getElementById('role-setter-btn');
+        const roleBreakerBtn = document.getElementById('role-breaker-btn');
+
+        const submitBtn = document.getElementById('submit-btn');
+        const newGameBtn = document.getElementById('new-game-btn');
+        const historyElement = document.getElementById('history');
+        const historyArea = document.getElementById('history-area'); 
+        const messageElement = document.getElementById('message');
+        const attemptsLeftElement = document.getElementById('attempts-left');
+        const modalBackdrop = document.getElementById('modal-backdrop');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+        const guessDisplayElement = document.getElementById('guess-display');
+        const keypadElement = document.getElementById('keypad');
+        const hintsListElement = document.getElementById('hints-list');
+        const hintsAreaElement = document.getElementById('hints-area');
+        const adminPanelContainer = document.getElementById('admin-panel-container');
+        const newPasscodeInput = document.getElementById('new-passcode');
+        const newAdminPasscodeInput = document.getElementById('new-admin-passcode'); // New input for admin code
+        const customHintsTextarea = document.getElementById('custom-hints');
+        const progressiveHintsTextarea = document.getElementById('progressive-hints'); 
+        const customDaresTextarea = document.getElementById('custom-dares'); 
+        const winnerLinkInput = document.getElementById('winner-link-input');
+        const winnerMessageInput = document.getElementById('winner-message-input');
+        const saveConfigBtn = document.getElementById('save-config-btn');
+        const saveStatusElement = document.getElementById('save-status');
+        const passcodeErrorElement = document.getElementById('passcode-error');
+        const adminPasscodeErrorElement = document.getElementById('admin-passcode-error'); // New error element
+        const currentPasscodeDisplay = document.getElementById('current-passcode-display');
+        const gameInputContainer = document.getElementById('game-input');
+        
+        // Dare Modal elements
+        const dareModalBackdrop = document.getElementById('dare-modal-backdrop');
+        const dareCompleteBtn = document.getElementById('dare-complete-btn');
+        
+        // Admin Auth Modal elements
+        const adminAuthModalBackdrop = document.getElementById('admin-auth-modal-backdrop');
+        const adminAuthDisplay = document.getElementById('admin-auth-display'); // New display element
+        const adminAuthFeedback = document.getElementById('admin-auth-feedback');
+        const adminMenuBtn = document.getElementById('admin-menu-btn');
+        const adminKeypadElement = document.getElementById('admin-keypad'); // New keypad container
+
+        
+        // --- FIREBASE INITIALIZATION & DATA MANAGEMENT ---
+
+        function initFirebase() {
+            setLogLevel('Debug');
+            // Safely retrieve global variables
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; 
+            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' && __firebase_config ? __firebase_config : '{}');
+            const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+            if (Object.keys(firebaseConfig).length === 0) {
+                 console.error("Firebase config missing.");
+                 messageElement.textContent = "Error: Database config missing. Cannot run game.";
+                 return;
+            }
+
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    userId = user.uid;
+                } else {
+                    if (!initialAuthToken) {
+                        try {
+                            const anonUser = await signInAnonymously(auth);
+                            userId = anonUser.user.uid;
+                        } catch(error) {
+                             console.error("Anonymous sign-in failed:", error);
+                        }
+                    }
+                }
+                
+                if (!user && initialAuthToken) {
+                    try {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                        userId = auth.currentUser.uid;
+                    } catch (error) {
+                        console.error("Custom token sign-in failed:", error);
+                        try {
+                             const anonUser = await signInAnonymously(auth);
+                            userId = anonUser.user.uid;
+                        } catch(error) {
+                             console.error("Fallback anonymous sign-in failed:", error);
+                        }
+                    }
+                }
+                isAuthReady = true;
+                listenToConfig(); 
+            });
+        }
+        
+        function listenToConfig() {
+            if (configSnapshotUnsubscribe) {
+                configSnapshotUnsubscribe();
+            }
+
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            // Config stored publicly so both players can read the code, dares, and link
+            const configRef = doc(db, 'artifacts', appId, 'public', 'data', 'lovers_game_config', CONFIG_DOC_ID); 
+
+            configSnapshotUnsubscribe = onSnapshot(configRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    // Game Config
+                    adminPasscodeStr = String(data.adminPasscode || DEFAULT_CONFIG.adminPasscode); // FETCH ADMIN CODE
+                    secretCodeStr = String(data.secretCode || DEFAULT_CONFIG.secretCode);
+                    initialCustomHints = Array.isArray(data.hints) ? data.hints : DEFAULT_CONFIG.hints;
+                    progressiveHints = Array.isArray(data.progressiveHints) && data.progressiveHints.length > 0 ? data.progressiveHints : DEFAULT_CONFIG.progressiveHints;
+                    revealedHints = Array.isArray(data.revealedHints) ? data.revealedHints : []; 
+                    currentDares = Array.isArray(data.dares) && data.dares.length > 0 ? data.dares : DEFAULT_DARES;
+                    winnerLink = data.winnerLink || DEFAULT_CONFIG.winnerLink; 
+                    winnerMessage = data.winnerMessage || DEFAULT_CONFIG.winnerMessage; 
+                } else {
+                    // Create default config if doc doesn't exist
+                    setDoc(configRef, DEFAULT_CONFIG, { merge: true }).catch(e => console.error("Error setting default config:", e));
+                    adminPasscodeStr = DEFAULT_CONFIG.adminPasscode;
+                    secretCodeStr = DEFAULT_CONFIG.secretCode;
+                    initialCustomHints = DEFAULT_CONFIG.hints;
+                    progressiveHints = DEFAULT_CONFIG.progressiveHints;
+                    revealedHints = [];
+                    currentDares = DEFAULT_DARES;
+                    winnerLink = DEFAULT_CONFIG.winnerLink; 
+                    winnerMessage = DEFAULT_CONFIG.winnerMessage;
+                }
+                
+                renderHints();
+                // Check if we need to reset the game view for the Breaker
+                if (gameContainer.classList.contains('hidden') === false && adminPanelContainer.classList.contains('hidden')) {
+                     setupGame(false, 'breaker');
+                }
+            }, (error) => {
+                console.error("Error listening to config:", error);
+                messageElement.textContent = "Error loading game config.";
+            });
+        }
+
+        async function saveConfiguration() {
+            const newCode = newPasscodeInput.value.trim();
+            const newAdminCode = newAdminPasscodeInput.value.trim(); // Get new admin code
+            
+            const rawHints = customHintsTextarea.value.trim();
+            const newInitialHints = rawHints.split('\n').map(h => h.trim()).filter(h => h.length > 0);
+            const rawProgressiveHints = progressiveHintsTextarea.value.trim(); 
+            const newProgressiveHints = rawProgressiveHints.split('\n').map(h => h.trim()).filter(h => h.length > 0); 
+            const rawDares = customDaresTextarea.value.trim(); 
+            const newDares = rawDares.split('\n').map(d => d.trim()).filter(d => d.length > 0);
+            
+            // FIX: Format the winner link before saving to ensure the protocol is present
+            const newWinnerLink = formatUrlForRedirect(winnerLinkInput.value); 
+            const newWinnerMessage = winnerMessageInput.value.trim();
+
+            saveConfigBtn.disabled = true;
+            saveStatusElement.classList.remove('hidden');
+            saveStatusElement.style.color = '#facc15';
+            saveStatusElement.textContent = 'Saving...';
+            passcodeErrorElement.classList.add('hidden');
+            adminPasscodeErrorElement.classList.add('hidden');
+
+            if (!/^\d+$/.test(newCode) || newCode.length === 0) {
+                passcodeErrorElement.classList.remove('hidden');
+                saveStatusElement.textContent = 'Set code failed: Game code must be one or more numeric digits (0-9).';
+                saveStatusElement.style.color = '#f87171';
+                saveConfigBtn.disabled = false;
+                return;
+            }
+            
+            if (!/^\d+$/.test(newAdminCode) || newAdminCode.length === 0 || newAdminCode === newCode) {
+                 adminPasscodeErrorElement.classList.remove('hidden');
+                 saveStatusElement.textContent = 'Set code failed: Admin code must be one or more digits and cannot be the same as the Game code.';
+                 saveStatusElement.style.color = '#f87171';
+                 saveConfigBtn.disabled = false;
+                 return;
+            }
+
+
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const configRef = doc(db, 'artifacts', appId, 'public', 'data', 'lovers_game_config', CONFIG_DOC_ID);
+            
+            try {
+                // IMPORTANT: When saving a new code, we reset the revealedHints array
+                await setDoc(configRef, {
+                    adminPasscode: newAdminCode, // Save new admin code
+                    secretCode: newCode,
+                    hints: newInitialHints,
+                    progressiveHints: newProgressiveHints, 
+                    revealedHints: [], // RESET REVEALED HINTS ON NEW CODE SET
+                    dares: newDares, 
+                    winnerLink: newWinnerLink, // Save the formatted link
+                    winnerMessage: newWinnerMessage, 
+                    lastUpdated: new Date().toISOString()
+                }, { merge: true });
+                
+                saveStatusElement.textContent = 'Configuration Saved! Pass device to Breaker for a fresh game.';
+                saveStatusElement.style.color = THEME_CONFIG.primaryColor;
+
+            } catch (e) {
+                console.error("Error saving configuration:", e);
+                saveStatusElement.textContent = 'Save failed: Check console.';
+                saveStatusElement.style.color = '#f87171';
+            } finally {
+                saveConfigBtn.disabled = false;
+                setTimeout(() => saveStatusElement.classList.add('hidden'), 5000);
+            }
+        }
+
+        // --- GAME FLOW LOGIC ---
+        
+        /**
+         * Initializes the game state and UI based on the chosen role.
+         */
+        function setupGame(initialStart = false, role = 'breaker') {
+            if (!isAuthReady && !initialStart) return; 
+
+            const codeLength = secretCodeStr.length;
+            attempts = 0;
+            isGameOver = false;
+            isDareActive = false;
+            currentGuessStr = ""; 
+
+            // RESET UI ELEMENTS
+            historyElement.innerHTML = '';
+            gameInputContainer.classList.remove('hidden'); 
+            historyArea.classList.remove('hidden'); 
+            
+            submitBtn.textContent = 'SUBMIT GUESS';
+            submitBtn.disabled = false;
+            attemptsLeftElement.textContent = MAX_ATTEMPTS;
+            
+            updateDisplay(); 
+            renderHints(); 
+            initializeKeypad(); 
+            newGameBtn.textContent = 'MENU';
+            
+            if (role === 'setter') {
+                 showAdminPanel(true);
+            } else {
+                 adminPanelContainer.classList.add('hidden');
+                 gameInputContainer.classList.remove('hidden');
+                 // Message is generic now since admin code is secret
+                 const breakerMessage = `Breaker: Enter your ${codeLength}-digit guess!`;
+                 messageElement.innerHTML = `Code Setter: Enter the <b style="color: var(--admin-color)">secret admin passcode</b> at any time to enter configuration. ${breakerMessage}`;
+                 messageElement.style.color = '#e0e0e0';
+            }
+        }
+
+        /**
+         * Handles the user submitting a guess.
+         */
+        function handleGuess() {
+            playClickSound('D5'); 
+            if (isDareActive) return; 
+            
+            const codeLength = secretCodeStr.length;
+            const guessStr = currentGuessStr;
+
+            // --- CHECK FOR ADMIN BACKDOOR ---
+            if (guessStr === adminPasscodeStr) {
+                currentGuessStr = ''; 
+                updateDisplay(); 
+                showAdminPanel(false);
+                return;
+            }
+            // --- END BACKDOOR CHECK & LENGTH CHECK ---
+            
+            if (guessStr.length !== codeLength) {
+                messageElement.textContent = `Error: Please enter a ${codeLength}-digit code.`;
+                messageElement.style.color = '#f87171';
+                currentGuessStr = ''; 
+                updateDisplay();
+                return;
+            }
+
+            currentGuessStr = ''; 
+            updateDisplay(); 
+            submitBtn.disabled = true;
+
+            attempts++;
+            const feedback = checkGuess(guessStr, secretCodeStr);
+            renderGuess(guessStr, feedback);
+
+            attemptsLeftElement.textContent = MAX_ATTEMPTS - attempts;
+            
+            // --- CHECK FOR PROGRESSIVE HINT REVEAL ---
+            let hintRevealed = false;
+            if (feedback.bulls >= PROGRESSIVE_BULLS_THRESHOLD) {
+                hintRevealed = revealNextProgressiveHint(feedback.bulls);
+            }
+            
+            // WIN CONDITION: Directs to link redirection logic
+            if (feedback.bulls === codeLength) {
+                endGame(true, attempts);
+                return;
+            } 
+            
+            // LOSE CONDITION
+            if (attempts >= MAX_ATTEMPTS) {
+                endGame(false);
+                return;
+            }
+
+            // WRONG GUESS - TRIGGER DARE
+            let baseMessage = `Attempt ${attempts}: ${feedback.bulls} Bulls, ${feedback.cows} Cows.`;
+            if (hintRevealed) {
+                messageElement.innerHTML = `${baseMessage} **A new hint was revealed!** Time for a Dare!`;
+            } else {
+                 messageElement.textContent = `${baseMessage} Time for a Dare!`;
+            }
+            
+            setTimeout(showDareModal, 500);
+        }
+        
+        // --- HINT LOGIC ---
+
+        /**
+         * If the guess meets the threshold, reveals the next unrevealed progressive hint.
+         * @returns {boolean} True if a new hint was revealed, false otherwise.
+         */
+        function revealNextProgressiveHint(bulls) {
+            if (!db) return false;
+            
+            const unrevealedIndex = revealedHints.length;
+            
+            // 1. Check if there are any progressive hints left to reveal
+            if (unrevealedIndex >= progressiveHints.length) {
+                return false;
+            }
+            
+            // 2. The next hint is ready to be revealed
+            const nextHint = progressiveHints[unrevealedIndex];
+            
+            // 3. Update the global state and save to Firestore
+            revealedHints.push({
+                hint: nextHint,
+                bullsTrigger: bulls,
+                attempt: attempts,
+                isNew: true
+            });
+            
+            saveRevealedHints(revealedHints);
+            
+            // 4. Rerender hints immediately
+            renderHints();
+            
+            return true;
+        }
+
+        async function saveRevealedHints(newRevealedHints) {
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const configRef = doc(db, 'artifacts', appId, 'public', 'data', 'lovers_game_config', CONFIG_DOC_ID); 
+
+            try {
+                await updateDoc(configRef, {
+                    revealedHints: newRevealedHints
+                });
+            } catch (e) {
+                console.error("Error saving revealed hints:", e);
+            }
+        }
+        
+        /**
+         * Renders the current list of hints (initial + revealed progressive) in the UI.
+         */
+        function renderHints() {
+            hintsListElement.innerHTML = '';
+            
+            const allHints = [
+                ...initialCustomHints.map(h => ({ hint: h, isNew: false, attempt: 0 })),
+                ...revealedHints
+            ];
+
+            if (allHints.length > 0) {
+                allHints.forEach(item => {
+                    const li = document.createElement('li');
+                    li.innerHTML = item.hint;
+                    
+                    if (item.isNew && item.attempt === attempts) {
+                        li.innerHTML += `<span class="new-hint-badge">NEW HINT</span>`;
+                    } else if (item.bullsTrigger) {
+                        li.innerHTML += `<span class="text-xs text-gray-500 ml-2">(Revealed at ${item.bullsTrigger}+ Bulls)</span>`;
+                    }
+
+                    hintsListElement.appendChild(li);
+                });
+                hintsAreaElement.classList.remove('hidden');
+            } else {
+                hintsAreaElement.classList.add('hidden');
+            }
+        }
+        // --- END HINT LOGIC ---
+
+        /**
+         * Ends the game and handles win or loss (both via modal).
+         */
+        function endGame(won, finalAttempts = null) {
+            isGameOver = true;
+            submitBtn.disabled = true;
+            submitBtn.textContent = won ? 'CODE CRACKED!' : 'GAME OVER';
+
+            Tone.start();
+            const now = Tone.now();
+            
+            gameInputContainer.classList.add('hidden'); 
+            adminPanelContainer.classList.add('hidden'); 
+            historyArea.classList.add('hidden'); 
+            
+            document.getElementById('secret-code-display').textContent = secretCodeStr;
+
+            if (won) {
+                 // VICTORY - SHOW WIN MODAL & SET BUTTON ACTION
+                 if(buttonSynth) buttonSynth.triggerAttackRelease(["E5", "G5", "C6"], "4n", now + 0.01); 
+                 
+                 document.getElementById('modal-title').textContent = 'SUCCESS!';
+                 document.getElementById('modal-title').style.color = THEME_CONFIG.primaryColor; 
+                 
+                 // Use the custom winnerMessage
+                 const defaultMsg = `You cracked the code in ${finalAttempts} attempt${finalAttempts !== 1 ? 's' : ''}!`;
+                 const finalMessage = winnerMessage && winnerMessage.trim().length > 0 
+                                      ? winnerMessage
+                                      : defaultMsg;
+
+                 document.getElementById('modal-message').textContent = finalMessage; 
+                 
+                 // FIX: Use the formatting function to ensure the stored URL is valid for redirection
+                 const safeUrl = formatUrlForRedirect(winnerLink);
+
+                 if (safeUrl) {
+                    // Set up the button for user-initiated redirection
+                    modalCloseBtn.textContent = 'CLAIM REWARD & REDIRECT';
+                    modalCloseBtn.setAttribute('data-action', 'redirect');
+                    modalCloseBtn.setAttribute('data-url', safeUrl); 
+                    modalCloseBtn.style.backgroundColor = THEME_CONFIG.primaryColor;
+                    messageElement.textContent = `Code cracked! Click CLAIM REWARD to proceed.`;
+                 } else {
+                     // Fallback if no link or invalid link is set
+                     modalCloseBtn.textContent = 'Play Again (Menu)';
+                     modalCloseBtn.setAttribute('data-action', 'menu');
+                     modalCloseBtn.removeAttribute('data-url');
+                     modalCloseBtn.style.backgroundColor = THEME_CONFIG.primaryColor;
+                     document.getElementById('modal-message').textContent += " (No valid reward link was set by the Code Setter.)";
+                     messageElement.textContent = `Code cracked! No reward link was set.`;
+                 }
+                 
+                 modalCloseBtn.disabled = false;
+                 messageElement.style.color = THEME_CONFIG.primaryColor;
+
+            } else {
+                 // DEFEAT - SHOW LOSE MODAL
+                 if(buttonSynth) buttonSynth.triggerAttackAttackRelease("C3", "4n", now + 0.01); 
+                 
+                 document.getElementById('modal-title').textContent = 'DEFEAT!';
+                 document.getElementById('modal-title').style.color = '#f87171'; 
+                 document.getElementById('modal-message').textContent = `You ran out of attempts.`;
+                 
+                 modalCloseBtn.textContent = 'Play Again (Menu)';
+                 modalCloseBtn.setAttribute('data-action', 'menu');
+                 modalCloseBtn.removeAttribute('data-url');
+                 modalCloseBtn.style.backgroundColor = '#f87171';
+            }
+            
+            modalBackdrop.classList.add('flex');
+            modalBackdrop.classList.remove('hidden');
+        }
+
+
+        // --- UTILITY FUNCTIONS ---
+        
+        function applyTheme() {
+            const theme = THEME_CONFIG;
+            const root = document.documentElement.style;
+            root.setProperty('--primary-color', theme.primaryColor);
+            root.setProperty('--bg-color', theme.bgColor);
+            root.setProperty('--shadow-color', theme.shadowColor);
+            root.setProperty('--admin-color', theme.adminColor);
+        }
+
+        /**
+         * Starts a 5-second countdown on the modal button before performing redirection.
+         * @param {string} url The URL to redirect to.
+         */
+        function startCountdownRedirect(url) {
+            let countdown = 5;
+            // Prevent accidental double-clicks or state resets from the button handler
+            modalCloseBtn.disabled = true;
+            modalCloseBtn.style.backgroundColor = '#059669'; // Darker green for countdown state
+            
+            // Remove previous countdown message if it exists
+            let countdownMessageElement = document.getElementById('countdown-message');
+            if(!countdownMessageElement) {
+                countdownMessageElement = document.createElement('p');
+                countdownMessageElement.id = 'countdown-message';
+                countdownMessageElement.className = 'text-sm text-yellow-300 font-bold mt-2';
+                document.getElementById('game-modal').appendChild(countdownMessageElement);
+            }
+            countdownMessageElement.textContent = `Automatic redirection in ${countdown} seconds.`;
+            modalCloseBtn.textContent = `REDIRECTING IN ${countdown}...`;
+
+
+            const interval = setInterval(() => {
+                if (countdown > 0) {
+                    playClickSound('C4'); 
+                    countdownMessageElement.textContent = `Automatic redirection in ${countdown} seconds.`;
+                    modalCloseBtn.textContent = `REDIRECTING IN ${countdown}...`;
+                    countdown--;
+                } else {
+                    clearInterval(interval);
+                    countdownMessageElement.textContent = 'Redirecting...';
+                    modalCloseBtn.textContent = 'REDIRECTING NOW!';
+                    window.location.href = url; // Final redirection
+                }
+            }, 1000);
+        }
+        
+        function showDareModal() {
+             if (currentDares.length === 0) {
+                 messageElement.textContent = "Phew! No dare was found. Lucky you!";
+                 hideDareModal(); 
+                 return;
+            }
+             isDareActive = true;
+             submitBtn.disabled = true; 
+             Tone.start();
+             const now = Tone.now();
+             if (buttonSynth) buttonSynth.triggerAttackRelease("C3", 0.5, now + 0.01); 
+             const dareTextElement = document.getElementById('dare-text');
+
+             dareCompleteBtn.disabled = true; 
+             dareModalBackdrop.classList.add('flex');
+             dareModalBackdrop.classList.remove('hidden');
+ 
+             dareTextElement.classList.add('is-randomizing'); 
+            
+             const finalDareIndex = Math.floor(Math.random() * currentDares.length);
+             let index = 0;
+ 
+             const interval = setInterval(() => {
+                 dareTextElement.textContent = currentDares[index % currentDares.length];
+                 index++;
+             }, 100); 
+ 
+             setTimeout(() => {
+                 clearInterval(interval);
+                 dareTextElement.classList.remove('is-randomizing'); 
+                 const finalDare = currentDares[finalDareIndex];
+                 dareTextElement.textContent = finalDare;
+                 dareCompleteBtn.disabled = false;
+                 playClickSound('G5'); 
+             }, 2000); 
+        }
+        
+        function hideDareModal() {
+            playClickSound('E5');
+            isDareActive = false;
+            dareModalBackdrop.classList.add('hidden');
+            dareModalBackdrop.classList.remove('flex');
+            
+             if (!isGameOver) {
+                const codeLength = secretCodeStr.length;
+                const isGameGuess = currentGuessStr.length === codeLength;
+                submitBtn.disabled = !isGameGuess;
+             }
+        }
+        
+        // --- ADMIN AUTH KEYPAD LOGIC ---
+        
+        function updateAdminDisplay() {
+            const ADMIN_CODE_MAX_LENGTH = adminPasscodeStr.length;
+            if (ADMIN_CODE_MAX_LENGTH === 0) {
+                adminAuthDisplay.textContent = 'ERROR';
+                return;
+            }
+            const currentLength = adminPasscodeInput.length;
+            const padding = '_'.repeat(ADMIN_CODE_MAX_LENGTH);
+            const obscuredInput = '*'.repeat(currentLength);
+            
+            const displayStr = (obscuredInput + padding).slice(0, ADMIN_CODE_MAX_LENGTH);
+            adminAuthDisplay.textContent = displayStr;
+        }
+
+        function appendAdminDigit(digit) {
+            const ADMIN_CODE_MAX_LENGTH = adminPasscodeStr.length;
+            if (adminPasscodeInput.length < ADMIN_CODE_MAX_LENGTH) {
+                adminPasscodeInput += digit;
+                updateAdminDisplay();
+                adminAuthFeedback.classList.add('hidden');
+            }
+            if (adminPasscodeInput.length === ADMIN_CODE_MAX_LENGTH) {
+                checkAdminPasscode();
+            }
+        }
+        
+        function deleteAdminDigit() {
+            if (adminPasscodeInput.length > 0) {
+                adminPasscodeInput = adminPasscodeInput.slice(0, -1);
+                updateAdminDisplay();
+                adminAuthFeedback.classList.add('hidden');
+            }
+        }
+
+        function checkAdminPasscode() {
+            if (adminPasscodeInput !== adminPasscodeStr) {
+                adminAuthFeedback.textContent = 'Incorrect Passcode. Try again.';
+                adminAuthFeedback.classList.remove('hidden');
+                adminPasscodeInput = ''; // Clear for retry
+                updateAdminDisplay();
+                playClickSound('C3'); 
+                return;
+            }
+
+            // Success case
+            adminAuthModalBackdrop.classList.add('hidden');
+            adminAuthModalBackdrop.classList.remove('flex');
+            setupGame(true, 'setter');
+            adminPasscodeInput = ''; // Reset after successful login
+        }
+
+        function initializeAdminKeypad() {
+            const layout = [7, 8, 9, 4, 5, 6, 1, 2, 3];
+            adminKeypadElement.innerHTML = '';
+            
+            layout.forEach(digit => {
+                const digitStr = String(digit);
+                const btn = document.createElement('button');
+                btn.textContent = digit;
+                btn.className = 'keypad-btn';
+                btn.addEventListener('click', () => { 
+                    playClickSound(digitNotes[digitStr]);
+                    appendAdminDigit(digitStr);
+                });
+                adminKeypadElement.appendChild(btn);
+            });
+            
+            // Clear Button (Delete)
+            const clearBtn = document.createElement('button');
+            clearBtn.innerHTML = '&#9003;'; 
+            clearBtn.className = 'keypad-btn keypad-clear';
+            clearBtn.title = 'Delete Last Digit';
+            clearBtn.addEventListener('click', () => {
+                playClickSound('F5');
+                deleteAdminDigit();
+            });
+            adminKeypadElement.appendChild(clearBtn);
+
+            // Zero Button
+            const zeroBtn = document.createElement('button');
+            zeroBtn.textContent = '0';
+            zeroBtn.className = 'keypad-btn';
+            zeroBtn.addEventListener('click', () => {
+                playClickSound(digitNotes['0']);
+                appendAdminDigit('0');
+            });
+            adminKeypadElement.appendChild(zeroBtn);
+
+            // Enter Button
+            const enterBtn = document.createElement('button');
+            enterBtn.innerHTML = '&#10003;'; // Checkmark
+            enterBtn.className = 'keypad-btn keypad-submit';
+            enterBtn.title = 'Submit Passcode';
+            enterBtn.addEventListener('click', () => {
+                playClickSound('D5');
+                checkAdminPasscode();
+            });
+            adminKeypadElement.appendChild(enterBtn);
+        }
+        
+        // --- END ADMIN AUTH KEYPAD LOGIC ---
+
+
+        function showAdminPanel(fromStartMenu) { 
+            isGameOver = true; 
+            gameInputContainer.classList.add('hidden');
+            historyArea.classList.add('hidden'); // Hide history when admin is active
+            adminPanelContainer.classList.remove('hidden');
+            
+            const adminColor = document.documentElement.style.getPropertyValue('--admin-color');
+            messageElement.textContent = fromStartMenu ? 
+                `Code Setter Mode: Set your config and pass the device to the Breaker.` :
+                `Code Setter Mode: Game Paused.`;
+            messageElement.style.color = adminColor;
+
+            currentPasscodeDisplay.textContent = secretCodeStr;
+            
+            // Populate inputs with current settings
+            newPasscodeInput.value = secretCodeStr;
+            newAdminPasscodeInput.value = adminPasscodeStr; // Populate admin code input
+            customHintsTextarea.value = initialCustomHints.join('\n');
+            progressiveHintsTextarea.value = progressiveHints.join('\n'); 
+            customDaresTextarea.value = currentDares.join('\n');
+            // Use the stored winnerLink for display, even if it's already been formatted
+            winnerLinkInput.value = winnerLink; 
+            winnerMessageInput.value = winnerMessage;
+            
+            saveStatusElement.classList.add('hidden');
+        }
+
+        function setRoleSetter() {
+            playClickSound('C5');
+            startMenu.classList.add('hidden');
+            gameContainer.classList.remove('hidden');
+            gameInputContainer.classList.add('hidden');
+            adminPanelContainer.classList.add('hidden');
+
+            adminPasscodeInput = ''; // Reset input state
+            updateAdminDisplay();
+            initializeAdminKeypad(); // Initialize the modal keypad
+            adminAuthFeedback.classList.add('hidden');
+            adminAuthModalBackdrop.classList.add('flex');
+            adminAuthModalBackdrop.classList.remove('hidden');
+        }
+        
+        function checkGuess(guessStr, codeStr) { 
+            const length = codeStr.length;
+            let bulls = 0;
+            let cows = 0;
+            const codeArr = codeStr.split('');
+            const guessArr = guessStr.split('');
+            const codeFlags = Array(length).fill(false);
+            const guessFlags = Array(length).fill(false);
+            for (let i = 0; i < length; i++) {
+                if (guessArr[i] === codeArr[i]) {
+                    bulls++;
+                    codeFlags[i] = true;
+                    guessFlags[i] = true;
+                }
+            }
+            for (let i = 0; i < length; i++) {
+                if (guessFlags[i]) continue;
+                for (let j = 0; j < length; j++) {
+                    if (codeFlags[j]) continue;
+                    if (guessArr[i] === codeArr[j]) {
+                        cows++;
+                        codeFlags[j] = true;
+                        break; 
+                    }
+                }
+            }
+            return { bulls, cows };
+        }
+
+        function renderGuess(guessStr, feedback) { 
+            const row = document.createElement('div');
+            row.className = 'guess-row';
+            const guessDisplay = document.createElement('span');
+            guessDisplay.className = 'guess-display-history';
+            guessDisplay.textContent = guessStr;
+            const feedbackContainer = document.createElement('div');
+            feedbackContainer.className = 'feedback-pegs';
+            const length = secretCodeStr.length;
+            for (let i = 0; i < feedback.bulls; i++) {
+                const bullPeg = document.createElement('span');
+                bullPeg.className = 'peg peg-bull'; 
+                bullPeg.title = 'Correct Digit, Correct Position (Green/Bull)';
+                feedbackContainer.appendChild(bullPeg);
+            }
+            for (let i = 0; i < feedback.cows; i++) {
+                const cowPeg = document.createElement('span');
+                cowPeg.className = 'peg peg-cow'; 
+                cowPeg.title = 'Correct Digit, Wrong Position (Yellow/Cow)';
+                feedbackContainer.appendChild(cowPeg);
+            }
+            const misses = length - (feedback.bulls + feedback.cows);
+            for (let i = 0; i < misses; i++) {
+                 const missPeg = document.createElement('span');
+                missPeg.className = 'peg peg-miss'; 
+                missPeg.title = 'Digit Not in Code (Red/Miss)';
+                feedbackContainer.appendChild(missPeg);
+            }
+            row.appendChild(guessDisplay);
+            row.appendChild(feedbackContainer);
+            historyElement.prepend(row);
+        }
+
+        function updateDisplay() { 
+            const adminCodeLength = adminPasscodeStr.length;
+            const codeLength = secretCodeStr.length; 
+            const maxInputLength = Math.max(codeLength, adminCodeLength); 
+            const padding = '_'.repeat(maxInputLength);
+            let displayStr = currentGuessStr;
+
+            if (currentGuessStr.length < maxInputLength) {
+                displayStr = (currentGuessStr + padding).slice(0, maxInputLength);
+                guessDisplayElement.style.letterSpacing = '0.75rem';
+            } else {
+                displayStr = currentGuessStr;
+                // Dynamically adjust letter spacing if the input gets too long
+                guessDisplayElement.style.letterSpacing = currentGuessStr.length > codeLength ? '0.3rem' : '0.75rem'; 
+            }
+            
+            guessDisplayElement.textContent = displayStr;
+
+            const isAdminGuess = currentGuessStr.length === adminCodeLength;
+            const isGameGuess = currentGuessStr.length === codeLength;
+            
+            submitBtn.disabled = !(isAdminGuess || isGameGuess) || isGameOver || isDareActive;
+        }
+
+        function appendDigit(digit) { 
+            const maxInputLength = Math.max(secretCodeStr.length, adminPasscodeStr.length);
+            if (currentGuessStr.length < maxInputLength && !isGameOver && !isDareActive) {
+                currentGuessStr += digit;
+                updateDisplay();
+                messageElement.textContent = 'Entering digits...';
+                messageElement.style.color = '#e0e0e0';
+            }
+        }
+
+        function deleteDigit() { 
+            if (currentGuessStr.length > 0 && !isGameOver && !isDareActive) {
+                currentGuessStr = currentGuessStr.slice(0, -1);
+                updateDisplay();
+            }
+        }
+
+        function initializeKeypad() { 
+            const layout = [7, 8, 9, 4, 5, 6, 1, 2, 3];
+            keypadElement.innerHTML = '';
+            
+            layout.forEach(digit => {
+                const digitStr = String(digit);
+                const btn = document.createElement('button');
+                btn.textContent = digit;
+                btn.className = 'keypad-btn';
+                btn.addEventListener('click', () => { 
+                    playClickSound(digitNotes[digitStr]);
+                    appendDigit(digitStr);
+                });
+                keypadElement.appendChild(btn);
+            });
+            
+            const clearBtn = document.createElement('button');
+            clearBtn.innerHTML = '&#9003;'; 
+            clearBtn.className = 'keypad-btn keypad-clear';
+            clearBtn.title = 'Delete Last Digit';
+            clearBtn.addEventListener('click', () => {
+                playClickSound('F5');
+                deleteDigit();
+            });
+            keypadElement.appendChild(clearBtn);
+
+            const zeroBtn = document.createElement('button');
+            zeroBtn.textContent = '0';
+            zeroBtn.className = 'keypad-btn';
+            zeroBtn.addEventListener('click', () => {
+                playClickSound(digitNotes['0']);
+                appendDigit('0');
+            });
+            keypadElement.appendChild(zeroBtn);
+
+            const spacerBtn = document.createElement('div');
+            spacerBtn.className = 'keypad-btn bg-transparent shadow-none border-0 cursor-default';
+            keypadElement.appendChild(spacerBtn);
+        }
+
+        // --- Event Listeners and Initial Load ---
+        window.onload = function() {
+            initAudio();
+            initFirebase();
+            initializeKeypad(); 
+            applyTheme();
+
+            // ROLE BUTTON LISTENERS
+            roleSetterBtn.addEventListener('click', setRoleSetter);
+            roleBreakerBtn.addEventListener('click', () => { 
+                playClickSound('E5'); 
+                startMenu.classList.add('hidden');
+                gameContainer.classList.remove('hidden');
+                setupGame(true, 'breaker'); 
+            });
+            
+            // Dare Modal listeners
+            dareCompleteBtn.addEventListener('click', hideDareModal);
+            
+            // Game button listeners
+            submitBtn.addEventListener('click', handleGuess);
+            
+            // Logic to go back to Start Menu (shared function)
+            const navigateToStartMenu = () => {
+                playClickSound('F5');
+                gameContainer.classList.add('hidden');
+                startMenu.classList.remove('hidden');
+                applyTheme();
+            };
+
+            newGameBtn.addEventListener('click', navigateToStartMenu);
+            adminMenuBtn.addEventListener('click', navigateToStartMenu);
+            
+            // MODAL ACTION BUTTON LISTENER (Handles both Menu return and Redirect)
+            modalCloseBtn.addEventListener('click', () => {
+                const action = modalCloseBtn.getAttribute('data-action');
+                const url = modalCloseBtn.getAttribute('data-url');
+                
+                // Remove the countdown message if it exists from a previous run
+                const existingCountdownMessage = document.getElementById('countdown-message');
+                if(existingCountdownMessage) {
+                    existingCountdownMessage.remove();
+                }
+
+                if (action === 'redirect' && url) {
+                    // Start the 5-second countdown and redirect
+                    startCountdownRedirect(url);
+                } else {
+                    // Default back to menu (or if 'redirect' was the action, but URL was missing)
+                    modalBackdrop.classList.add('hidden');
+                    modalBackdrop.classList.remove('flex');
+                    navigateToStartMenu();
+                    
+                    // Reset button state for next game attempt
+                    modalCloseBtn.setAttribute('data-action', 'menu');
+                    modalCloseBtn.removeAttribute('data-url');
+                    modalCloseBtn.textContent = 'Play Again (Menu)';
+                    modalCloseBtn.style.backgroundColor = THEME_CONFIG.primaryColor; 
+                }
+            });
+
+
+            saveConfigBtn.addEventListener('click', () => {
+                playClickSound('G5');
+                saveConfiguration();
+            });
+        };
+    </script>
+</body>
+</html>
